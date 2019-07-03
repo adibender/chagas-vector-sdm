@@ -1,0 +1,30 @@
+Package: mastergrids
+Title: Utility Functions for Grid Data Workflows
+Version: 0.0.3
+Authors@R: c(
+  person("Andreas", "Bender", , "andreas.bender@bdi.ox.ac.uk", role = c("aut", "cre"), comment=c(ORCID = "0000-0001-5628-8611")))
+Description: The main functionality consists of (i) searching for GeoTiff files
+  in the "mastergrids" directory (or any other directory), importing grid data
+  and embedding (spatial) data sets with grid data.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 6.1.1
+Depends:
+    R (>= 3.1.0)
+Imports:
+    magrittr,
+    raster,
+    purrr,
+    furrr,
+    tmap,
+    sp,
+    checkmate,
+    dplyr,
+    stringr,
+    tidyr
+Suggests:
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
