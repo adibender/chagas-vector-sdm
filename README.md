@@ -357,7 +357,7 @@ bivar_map <- tm_bivariate(ndf, env_grids[[1]], sp_fold_pans_meg)
 tm_bivar_draw(bivar_map, x = .55, y = .05)
 ```
 
-<img align = "center" src="figures/unnamed-chunk-15-1.png" title="plot of chunk unnamed-chunk-15" alt="plot of chunk unnamed-chunk-15" width="300px" style="display: block; margin: auto;" />
+<img align = "center" src="figures/unnamed-chunk-15-1.png" title="plot of chunk unnamed-chunk-15" alt="plot of chunk unnamed-chunk-15" width="300px"/>
 
 
 
