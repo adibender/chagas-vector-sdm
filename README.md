@@ -8,6 +8,7 @@ could not be made public. Therefore, we provide here code that demonstrates the
 workflow and uses freely available data only. Note: the folder structure is
 described further below after the exemplary analysis.
 
+If anything is unclear or not working, please don't hesitate to open up an issue.
 
 
 # Examplary analysis
