@@ -17,3 +17,7 @@ saved as PDF as well as `.tif` raster files in **`prediction-maps`**
 
 - `analyses-publication-sdm.R`: Produces tables and figures that are
 used in the manuscript/publication (manuscript is developed at Overleaf)
+
+- `additional-analyses-revision.R`: Additional analyses performed during revision
+process
+-

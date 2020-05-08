@@ -39,6 +39,7 @@ get_sp_folds <- function(
   showBlocks    = FALSE,
   progress      = FALSE,
   maskBySpecies = TRUE,
+  calc_range    = TRUE,
   ... ) {
 
   data$presence <- 1L * (data[[species_var]] == species)
@@ -75,8 +76,13 @@ get_sp_folds <- function(
   # exclude absences outside extended hull
   data <- raster::intersect(data, hull)
 
-  vario <- get_variogram(data)
-  range <- vario$var_model$range[2] * 1e3
+  if (calc_range) {
+    vario <- get_variogram(data)
+    range <- vario$var_model$range[2] * 1e3
+  } else {
+    vario = NULL
+    range = NULL
+  }
 
   # approximates the length of one block based on the landmass area
   # of the spatial extent of the species and approximate number of blocks
