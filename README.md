@@ -42,19 +42,22 @@ Set1   <- RColorBrewer::brewer.pal(9, "Set1")
 ## Data Import
 - In the publication we used the data from
 [Ceccarelli, Balsalobre, Medone, et al. (2018)](https://www.nature.com/articles/sdata201871) and some additional data (but not much). The former is openly available ([figshare download link](https://doi.org/10.6084/m9.figshare.c.3946936) (EXCEL file))
-- After download, the file was converted to `.csv` file.
-- Some additional preprocessing is performed after read-in
+- The code below downloads, imports the file and performs some preprocessing
 
 
 ```r
-presence_vector <- readr::read_csv(
-    file = "SciDataData_CitationCeccarellietal_2018.csv",
-    na = c("", " ", "NR", "NA")) %>%
+library(httr)
+GET("https://ndownloader.figshare.com/files/10302303",
+  write_disk(tf <- tempfile(fileext = ".xls")))
+df <- readxl::read_excel(tf, 1L, na = c("", " ", "NR", "NA"))
+presence_vector <- df %>%
   mutate(
     area = 25L, # analysis will be performed at 5x5 square km resolution
     Start_year = as.integer(substr(year, 1L, 4L)),
-    End_year   = as.integer(substr(year, 6L, 9L))) %>%
-  rename("reference" = "associatedReferences") %>%
+    End_year   = as.integer(substr(year, 6L, 9L)))
+presence_vector$reference <- df[[17]]
+presence_vector[, 17] <- NULL
+presence_vector <- presence_vector %>%
   mutate(
     Public_year = as.integer(stringr::str_extract(.data$reference, "[0-9]{4}")),
     Public_year = ifelse(Public_year > 2018L, NA, Public_year),
@@ -69,6 +72,7 @@ presence_vector <- readr::read_csv(
   rename_all(~tolower(sub(" ", "_", .))) %>%
   select(-reference)
 ```
+
 - imputation of the "year" variable if missing
 
 
