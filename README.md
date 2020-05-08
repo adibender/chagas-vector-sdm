@@ -340,7 +340,7 @@ tm_shape(raster::crop(countries, raster::extent(sp_fold_pans_meg$hull))) +
     breaks = seq(0, 1, by = .2), alpha = .8)
 ```
 
-<img align = "center" src="figures/unnamed-chunk-14-1.png" title="plot of chunk unnamed-chunk-14" alt="plot of chunk unnamed-chunk-14" width="300px" style="display: block; margin: auto;" />
+<img src="figures/unnamed-chunk-14-1.png" title="plot of chunk unnamed-chunk-14" alt="plot of chunk unnamed-chunk-14" width="300px" style="display: block; margin: auto;" />
 
  - Bivariate map (this is not well implemented in the moment in R), manual hacks
  required (alternatively, could predict upper/lower CI and plot CI alongside prediction)
@@ -357,8 +357,9 @@ bivar_map <- tm_bivariate(ndf, env_grids[[1]], sp_fold_pans_meg)
 tm_bivar_draw(bivar_map, x = .55, y = .05)
 ```
 
-<img align = "center" src="figures/unnamed-chunk-15-1.png" title="plot of chunk unnamed-chunk-15" alt="plot of chunk unnamed-chunk-15" width="300px"/>
-
+<p align="center">
+<img src="figures/unnamed-chunk-15-1.png" title="plot of chunk unnamed-chunk-15" alt="plot of chunk unnamed-chunk-15" width="300px"/>
+</p>
 
 
 
