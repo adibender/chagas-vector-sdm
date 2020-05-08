@@ -288,7 +288,7 @@ tmap_cv <- function(
 #'
 #' @inheritParams get_pmap_ci
 #' @export
-tmap_sdm <- function(cv, fold, countries, width = 10) {
+tmap_sdm <- function(cv, fold, countries) {
 
   # print(cv$species)
   tm_shape(countries, is.master = TRUE) +
@@ -302,7 +302,7 @@ tmap_sdm <- function(cv, fold, countries, width = 10) {
   tm_layout(
     title             = cv$species,
     title.size        = 1.5,
-    title.fontface = "italic",
+    title.fontface    = "italic",
     legend.position   = c("left", "bottom"),
     legend.text.size  = 1.2,
     legend.hist.size  = 1.2,
@@ -329,13 +329,109 @@ tmap_sdm <- function(cv, fold, countries, width = 10) {
 #' Defaults to 10 degrees.
 #' @importFrom mastergrids grid_to_df df_to_grid
 #' @export
+get_pmap <- function(
+  cv,
+  fold,
+  env_grids,
+  countries,
+  width    = 10,
+  discrete = FALSE,
+  ind      = NULL) {
+
+  new_hull <- fold$train %>%
+    rgeos::gConvexHull() %>%
+    rgeos::gBuffer(width = 10)
+  crp_countries <- raster::crop(countries, raster::extent(new_hull))
+
+  ndf <- env_grids %>%
+    raster::crop(raster::extent(fold$hull)) %>%
+    raster::mask(fold$hull) %>%
+    mastergrids::grid_to_df()
+  if (is.null(ind)) {
+    mod <- get_best_mod(cv)
+  } else {
+    mod <- cv$cv_results$mod[[ind]]
+  }
+  pred <- predict(mod, newdata = ndf, type = "link", se.fit = TRUE,
+    discrete = discrete, block.size = 1e5)
+  fit <- exp(pred$fit)/(1 + exp(pred$fit))
+
+  ndf$prediction <- fit
+
+  grid_pred <- mastergrids::df_to_grid(ndf, env_grids[[1]], "prediction")
+
+  cv$grid <- grid_pred
+  tmap_sdm(cv, fold, crp_countries)
+
+}
+
+#' @rdname get_pmap
+#' @export
 get_pmap_ci <- function(
   cv,
   fold,
   env_grids,
   countries,
-  width = 10,
-  discrete = FALSE) {
+  width    = 10,
+  discrete = FALSE,
+  ind      = NULL,
+  final    = FALSE) {
+
+  new_hull <- fold$train %>%
+    rgeos::gConvexHull() %>%
+    rgeos::gBuffer(width = 10)
+  crp_countries <- raster::crop(countries, raster::extent(new_hull))
+
+  ndf <- env_grids %>%
+    raster::crop(raster::extent(fold$hull)) %>%
+    raster::mask(fold$hull) %>%
+    mastergrids::grid_to_df()
+  if(final) {
+    mod <- cv$final_mod
+  } else {
+    if (is.null(ind)) {
+      mod <- get_best_mod(cv)
+    } else {
+      mod <- cv$cv_results$mod[[ind]]
+    }
+  }
+  pred <- predict(mod, newdata = ndf, type = "link", se.fit = TRUE,
+    discrete = discrete, block.size = 1e5)
+  fit <- exp(pred$fit)/(1 + exp(pred$fit))
+  ci_lower <- pred$fit - 2*pred$se
+  ci_lower <- exp(ci_lower)/(1 + exp(ci_lower))
+  ci_upper <- pred$fit + 2*pred$se
+  ci_upper <- exp(ci_upper)/(1 + exp(ci_upper))
+
+  ndf$prediction <- fit
+  ndf$ci_lower <- ci_lower
+  ndf$ci_upper <- ci_upper
+
+  grid_pred <- mastergrids::df_to_grid(ndf, env_grids[[1]], "prediction")
+  grid_lower <- mastergrids::df_to_grid(ndf, env_grids[[1]], "ci_lower")
+  grid_upper <- mastergrids::df_to_grid(ndf, env_grids[[1]], "ci_upper")
+
+  cv$grid <- grid_pred
+  map_pred <- tmap_sdm(cv, fold, crp_countries)
+  cv$grid <- grid_lower
+  map_lower <- tmap_sdm(cv, fold, crp_countries)
+  cv$grid <- grid_upper
+  map_upper <- tmap_sdm(cv, fold, crp_countries)
+
+  list(lower = map_lower, pred = map_pred, upper = map_upper)
+
+}
+
+#' @rdname get_pmap
+#' @export
+get_pmap_ci_mod <- function(
+  mod,
+  fold,
+  env_grids,
+  countries,
+  width    = 10,
+  discrete = FALSE,
+  ind      = NULL) {
 
   new_hull <- fold$train %>%
     rgeos::gConvexHull() %>%
@@ -347,27 +443,28 @@ get_pmap_ci <- function(
     raster::mask(fold$hull) %>%
     mastergrids::grid_to_df()
 
-  pred <- predict(get_best_mod(cv), newdata = ndf, type = "link", se.fit = TRUE,
+  pred <- predict(mod, newdata = ndf, type = "link", se.fit = TRUE,
     discrete = discrete, block.size = 1e5)
-  # fit <- exp(pred$fit)/(1 + exp(pred$fit))
+  fit <- exp(pred$fit)/(1 + exp(pred$fit))
   ci_lower <- pred$fit - 2*pred$se
   ci_lower <- exp(ci_lower)/(1 + exp(ci_lower))
   ci_upper <- pred$fit + 2*pred$se
   ci_upper <- exp(ci_upper)/(1 + exp(ci_upper))
 
-  # ndf$prediction = fit
+  ndf$prediction <- fit
   ndf$ci_lower <- ci_lower
   ndf$ci_upper <- ci_upper
 
-  # grid_pred <- mastergrids::df_to_grid(ndf, env_grids[[1]], "prediction")
+  grid_pred <- mastergrids::df_to_grid(ndf, env_grids[[1]], "prediction")
   grid_lower <- mastergrids::df_to_grid(ndf, env_grids[[1]], "ci_lower")
   grid_upper <- mastergrids::df_to_grid(ndf, env_grids[[1]], "ci_upper")
 
-  map_pred <- tmap_sdm(cv, fold, crp_countries, width = 10)
+  cv$grid <- grid_pred
+  map_pred <- tmap_sdm(cv, fold, crp_countries)
   cv$grid <- grid_lower
-  map_lower <- tmap_sdm(cv, fold, crp_countries, width = 10)
+  map_lower <- tmap_sdm(cv, fold, crp_countries)
   cv$grid <- grid_upper
-  map_upper <- tmap_sdm(cv, fold, crp_countries, width = 10)
+  map_upper <- tmap_sdm(cv, fold, crp_countries)
 
   list(lower = map_lower, pred = map_pred, upper = map_upper)
 
@@ -387,7 +484,7 @@ get_breaks <- function(vec) {
 #'
 #' Bivariate map that simultaneously conveys prediction and uncertainty
 #'
-#' @param data A data frame containing colums "prediction" and "se".
+#' @param data A data frame containing colums "prediction" and "ci".
 #' @param grid A place-holder grid/raster.
 #' @param fold Species information.
 #' @param palette A bivariate colour palette.
@@ -405,35 +502,52 @@ tm_bivariate <- function(
   data,
   grid,
   fold,
-  x_name = "Standard Error",
-  y_name = "Prediction",
+  x_name     = "Uncertainty",
+  y_name     = "Prediction",
   palette    = stevens.bluered(n = 9),
   alpha      = .8,
   main.title = NULL,
   shp        = countries,
-  size_frac  = 15,
-  name       = "prediction") {
+  name       = "prediction",
+  cut_fit    = NA,
+  cut_se     = NA,
+  export     = FALSE,
+  add_points_before = FALSE,
+  add_points_after  = FALSE,
+  additional_polygons_after = NULL) {
 
   hull <- fold$hull
-  ehull <- fold$train %>%
-    rgeos::gConvexHull() %>%
-    rgeos::gBuffer(width = 10)
+  # ehull <- fold$train %>%
+  #   rgeos::gConvexHull() %>%
+  #   rgeos::gBuffer(width = 10)
 
-  n_brks <- sqrt(length(palette))
-  brks_fit <- classInt::classIntervals(data$prediction, n = n_brks)
-  brks_se <- classInt::classIntervals(data$se, n = n_brks)
+  n_brks <- ceiling(sqrt(length(palette)))
+  if (is.na(cut_fit[1])) {
+    brks_fit <- classInt::classIntervals(data$prediction, n = n_brks, style = "quantile")
+    class_fit <- classInt::findCols(brks_fit)
+  } else {
+    class_fit <- cut(data$prediction, breaks = cut_fit) %>% as.numeric()
+  }
+  if (is.na(cut_se[1])) {
+    brks_se <- classInt::classIntervals(data$ci, n = n_brks, style = "quantile")
+    class_se <- classInt::findCols(brks_se)
+  } else {
+    class_se <- cut(data$ci, breaks = cut_se) %>% as.numeric()
+  }
 
-  class_fit <- classInt::findCols(brks_fit)
-  class_se <- classInt::findCols(brks_se)
   data$pred_c2 <- class_fit + n_brks * (class_se - 1)
   unique_val <- unique(data$pred_c2) %>% sort()
   pal_order <- map(seq_len(n_brks), ~.x + n_brks * (seq_len(n_brks) - 1)) %>%
     unlist()
 
-  grid <- df_to_grid(data, grid, "pred_c2")
+  grid <- df_to_grid(data, grid, "pred_c2") %>%
+    raster::crop(raster::extent(hull))
   names(grid) <- name
+  if(export) {
+    writeRaster(x = grid, filename = paste0("bivar_grid_", fold$species, ".grd"))
+  }
 
-  shp <- shp %>% raster::crop(raster::extent(ehull))
+  shp <- shp %>% raster::crop(raster::extent(hull))
 
   bbox_ehull <- st_bbox(shp)
   bbox_hull <- st_bbox(hull)
@@ -446,11 +560,32 @@ tm_bivariate <- function(
   ## ggplot map object
   gg_map <- ggplot() +
     geom_sf(data = st_as_sf(shp), fill = NA, alpha = alpha) +
+    # geom_sf(data = st_as_sf(fold$train)) +
     coord_sf(
       default = TRUE,
       xlim    = bbox_ehull[c(1, 3)],
-      ylim    = bbox_ehull[c(2, 4)]) +
-    theme(panel.grid.major = element_line(colour = 'transparent'))
+      ylim    = bbox_ehull[c(2, 4)], expand = FALSE) +
+    theme(
+      panel.grid.major = element_line(colour = 'transparent'),
+      plot.margin  = unit(c(0,0,0,0), "null"),
+      panel.spacing  = unit(c(0,0,0,0), "null"),
+      axis.title.x = element_blank(),
+      axis.text.x  = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.text.y  = element_blank(),
+      axis.ticks.y = element_blank())
+    if(add_points_before) {
+    presence_df <- fold$train[fold$train$presence == 1, ] %>%
+      raster::crop(raster::extent(hull))
+    presence_df_test <- fold$test[fold$test$presence == 1, ] %>%
+      raster::crop(raster::extent(hull))
+    presence_df <- rbind(presence_df, presence_df_test)
+    gg_map <- gg_map +
+      geom_sf(
+        data = st_as_sf(presence_df),
+        size = .25)
+  }
   ## add bivariate map raster layer
   gg_map <- gg_map +
     stars::geom_stars(
@@ -461,11 +596,27 @@ tm_bivariate <- function(
     xlab("") + ylab("") + ggtitle(main.title) +
     theme(panel.grid.major = element_line(colour = 'transparent'))
 
+  if(add_points_after) {
+    presence_df <- fold$train[fold$train$presence == 1, ] %>%
+      raster::crop(raster::extent(hull))
+    presence_df_test <- fold$test[fold$test$presence == 1, ] %>%
+      raster::crop(raster::extent(hull))
+    presence_df <- rbind(presence_df, presence_df_test)
+    gg_map <- gg_map +
+      geom_sf(
+        data = st_as_sf(presence_df),
+        size = .25)
+
+  }
+  if(!is.null(additional_polygons_after)) {
+    gg_map <- gg_map +
+      geom_sf(data = st_as_sf(additional_polygons_after), fill = NA, alpha = 1)
+  }
+
   ## ggplot legend object
   legend <- tm_bivar_legend(
     palette         = palette,
-    hull            = ehull,
-    size_frac       = size_frac)
+    hull            = hull)
   gg_legend <- ggplot() +
     geom_sf(data = legend, mapping = aes(fill = fill)) +
     scale_fill_identity() +
@@ -475,7 +626,7 @@ tm_bivariate <- function(
   theme(
     axis.text = element_blank(),
     axis.ticks = element_blank(),
-    axis.title = element_text(size = rel(1)),
+    axis.title = element_text(size = rel(1.3)),
     panel.grid.major = element_line(colour = 'transparent'))
   # print(gg_map)
   # vp <- grid::viewport(x = .2, y = .2, width = .2, height = .2)
@@ -494,8 +645,7 @@ tm_bivariate <- function(
 #' @importFrom sp CRS
 tm_bivar_legend <- function(
   palette,
-  hull,
-  size_frac = 15) {
+  hull) {
 
   crs_hull <- CRS(projection(hull))
   bbox <- st_bbox(hull)
@@ -512,18 +662,50 @@ tm_bivar_legend <- function(
     b1 + 2 * step_length, b2 + 2 * step_length,
     b1 + 1 * step_length, b2 + 2 * step_length,
     b1 + 1 * step_length, b2 + 1 * step_length)
-  # Copy it 8 times
-  list_of_rectangles <- list(
-    first_rectangle + c(0 * step_length, 0 * step_length),
-    first_rectangle + c(1 * step_length, 0 * step_length),
-    first_rectangle + c(2 * step_length, 0 * step_length),
-    first_rectangle + c(0 * step_length, 1 * step_length),
-    first_rectangle + c(1 * step_length, 1 * step_length),
-    first_rectangle + c(2 * step_length, 1 * step_length),
-    first_rectangle + c(0 * step_length, 2 * step_length),
-    first_rectangle + c(1 * step_length, 2 * step_length),
-    first_rectangle + c(2 * step_length, 2 * step_length)
-  )
+
+  if(length(palette) == 9) {
+
+  # Copy it length(palette) times
+    list_of_rectangles <- list(
+      first_rectangle + c(0 * step_length, 0 * step_length),
+      first_rectangle + c(1 * step_length, 0 * step_length),
+      first_rectangle + c(2 * step_length, 0 * step_length),
+      first_rectangle + c(0 * step_length, 1 * step_length),
+      first_rectangle + c(1 * step_length, 1 * step_length),
+      first_rectangle + c(2 * step_length, 1 * step_length),
+      first_rectangle + c(0 * step_length, 2 * step_length),
+      first_rectangle + c(1 * step_length, 2 * step_length),
+      first_rectangle + c(2 * step_length, 2 * step_length)
+    )
+
+  }
+  if(length(palette) == 16) {
+    first_rectangle <- c(
+    b1 + 1 * step_length, b2 + 1 * step_length,
+    b1 + 2 * step_length, b2 + 1 * step_length,
+    b1 + 2 * step_length, b2 + 2 * step_length,
+    b1 + 1 * step_length, b2 + 2 * step_length,
+    b1 + 1 * step_length, b2 + 1 * step_length)
+  # Copy it length(palette) times
+    list_of_rectangles <- list(
+      first_rectangle + c(0 * step_length, 0 * step_length),
+      first_rectangle + c(1 * step_length, 0 * step_length),
+      first_rectangle + c(2 * step_length, 0 * step_length),
+      first_rectangle + c(3 * step_length, 0 * step_length),
+      first_rectangle + c(0 * step_length, 1 * step_length),
+      first_rectangle + c(1 * step_length, 1 * step_length),
+      first_rectangle + c(2 * step_length, 1 * step_length),
+      first_rectangle + c(3 * step_length, 1 * step_length),
+      first_rectangle + c(0 * step_length, 2 * step_length),
+      first_rectangle + c(1 * step_length, 2 * step_length),
+      first_rectangle + c(2 * step_length, 2 * step_length),
+      first_rectangle + c(3 * step_length, 2 * step_length),
+      first_rectangle + c(0 * step_length, 3 * step_length),
+      first_rectangle + c(1 * step_length, 3 * step_length),
+      first_rectangle + c(2 * step_length, 3 * step_length),
+      first_rectangle + c(3 * step_length, 3 * step_length)
+    )
+  }
 
   # Transform it as a list of polygons
   geo_rectangles <- map(
@@ -539,25 +721,57 @@ tm_bivar_legend <- function(
 
 
 #' @rdname tm_bivariate
-#' @param cv Cross validation output for species.
+#' @param mod Model object.
 #' @param fold Fold information for species.
 #' @param env_grids Environmental covariates
 #' @param ... Further arguments passed to tm_bivariate
 #' @importFrom mastergrids grid_to_df
 #' @export
-tm_bivar_cv <- function(cv, fold, env_grids, discrete = TRUE, ...) {
+tm_bivar_mod <- function(mod, fold, env_grids, discrete = TRUE,
+  mask = NULL, ...) {
 
-  mod <- get_best_mod(cv)
   hull <- fold$hull
-
-  pred_df <- grid_to_df(env_grids, hull, hull)
-  pred <- predict(get_best_mod(cv), pred_df, type = "response", se = TRUE,
+  env_grids <- env_grids %>%
+    raster::crop(hull) %>%
+    raster::mask(hull)
+  if(!is.null(mask)) {
+    env_grids <- env_grids %>% raster::mask(mask)
+  }
+  pred_df <- grid_to_df(env_grids)
+  pred <- predict(mod, pred_df, type = "link", se = TRUE,
     discrete = discrete,
     block.size = 1e5)
-  pred_df$prediction <- pred$fit
+  pred_df$prediction <- exp(pred$fit)/(1 + exp(pred$fit))
   pred_df$se <- pred$se.fit
+  ci_upper   <- pred$fit + 1.96 * pred$se.fit
+  ci_lower   <- pred$fit - 1.96 * pred$se.fit
+  ci_upper   <- exp(ci_upper) / (1 + exp(ci_upper))
+  ci_lower   <- exp(ci_lower) / (1 + exp(ci_lower))
+  pred_df$ci <- ci_upper - ci_lower
 
   tm_bivariate(pred_df, env_grids[[1]], fold, ...)
+
+}
+
+tm_bivar_draw <- function(tm_bivar,
+  x = .15, y = .15, width = .25, height = .25) {
+
+ cowplot::ggdraw() +
+  cowplot::draw_plot(tm_bivar[[1]] +
+    theme(axis.text = element_text(size = rel(1.2)))) +
+  cowplot::draw_plot(tm_bivar[[2]], x, y, width, height)
+
+}
+
+tm_bivar_cv <- function(cv, fold, env_grids, discrete = TRUE, final = FALSE, ...) {
+
+  if(final) {
+    mod <- cv[["final_mod"]]
+  } else {
+    mod <- get_best_mod(cv)
+  }
+
+  tm_bivar_mod(mod, fold, env_grids, discrete = discrete, ...)
 
 }
 
@@ -574,13 +788,43 @@ tm_bivar_draw <- function(tm_bivar,
 #' Quick plot of predictions
 #'
 #' @export
-tmap_pred <- function(pred_df, grid, shp, col = "prediction") {
+tmap_pred <- function(pred_df, grid, shp, col = "prediction",
+  title = "prediction", alpha = .8) {
 
   names(grid) <- col
   pred_grid <- mastergrids::df_to_grid(pred_df, grid, col)
   tm_shape(shp)  +
     tm_borders() +
   tm_shape(pred_grid) +
-    tm_raster(alpha = .8, style = "cont", palette = viridis::magma(1e3))
+    tm_raster(alpha = alpha, style = "cont", palette = viridis::magma(1e3),
+      breaks = seq(0, 1, by = .2),
+      title = title)
+
+}
+
+
+#' @rdname tm_bivariate
+#' @param mod Model object.
+#' @param fold Fold information for species.
+#' @param env_grids Environmental covariates
+#' @param ... Further arguments passed to tm_bivariate
+#' @importFrom mastergrids grid_to_df
+#' @export
+tm_bivar_raster <- function(
+  path_pred,
+  path_cil,
+  path_ciu,
+  fold,
+  mask = NULL,
+  ...) {
+
+  species <- sub(" ", ".", fold$species)
+  pred_df <- grid_to_df(raster::brick(path_pred)[[species]], fold$hull, fold$hull)
+  cil <- grid_to_df(raster::brick(path_cil)[[species]], fold$hull, fold$hull)
+  ciu <- grid_to_df(raster::brick(path_ciu)[[species]], fold$hull, fold$hull)
+  names(pred_df)[3] <- "prediction"
+  pred_df$ci <- ciu[, 3] - cil[, 3]
+
+  tmbv <- tm_bivariate(pred_df, env_grids[[1]], fold, ...)
 
 }
