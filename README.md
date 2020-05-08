@@ -41,9 +41,9 @@ Set1   <- RColorBrewer::brewer.pal(9, "Set1")
 
 ## Data Import
 - In the publication we used the data from
-[Ceccarelli, Balsalobre, Medone, et al. (2018)](https://www.nature.com/articles/sdata201871) and some additional data (but not much). The former is openly available (there is a download link for an EXCEL file)
+[Ceccarelli, Balsalobre, Medone, et al. (2018)](https://www.nature.com/articles/sdata201871) and some additional data (but not much). The former is openly available ([figshare download link](https://doi.org/10.6084/m9.figshare.c.3946936) (EXCEL file))
 - After download, the file was converted to `.csv` file.
-- Some additional preprocessing is performed afterwards
+- Some additional preprocessing is performed after read-in
 
 
 ```r
