@@ -8,24 +8,10 @@ could not be made public. Therefore, we provide here code that demonstrates the
 workflow and uses freely available data only. Note: the folder structure is
 described further below after the exemplary analysis.
 
----
-title: Exemplary Workflow
-author: Andreas Bender
-date: '2020-05-08'
-output:
-  html_document:
-    toc: true
-    toc_float:
-      collapsed: true
-      smooth_scroll: false
-    toc_depth: 4
-    self_contained: true
----
 
 
-
-
-This document illustrates the workflow presented in [Bender, Python, Lindsay, et al. (2019)](https://www.biorxiv.org/content/10.1101/738310v1). Note that full details are given in the manuscript and
+# Examplary analysis
+This section illustrates the workflow presented in [Bender, Python, Lindsay, et al. (2019)](https://www.biorxiv.org/content/10.1101/738310v1). Note that full details are given in the manuscript and
 this code repository. However, as the full data and covariate layers could not be shared, this demo provides a reproducible example with freely available data.
 Results based on this data should not differ too much from published results.
 
@@ -415,7 +401,7 @@ URL:
 
 
 
-## Folder structure
+# Folder structure
 Overview of project files and folders:
 
 - Preliminary notes:
