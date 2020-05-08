@@ -201,7 +201,9 @@ tmap_cv(
   countries = countries)
 ```
 
+<p align="center">
 <img align="center" src="figures/unnamed-chunk-9-1.png" title="plot of chunk unnamed-chunk-9" alt="plot of chunk unnamed-chunk-9" width="300px" style="display: block; margin: auto;" />
+</p>
 
 ### 4. Fit the model
 - In the paper we run a CV for different model specifications on folds 1 - 4
@@ -340,7 +342,9 @@ tm_shape(raster::crop(countries, raster::extent(sp_fold_pans_meg$hull))) +
     breaks = seq(0, 1, by = .2), alpha = .8)
 ```
 
+<p align="center">
 <img src="figures/unnamed-chunk-14-1.png" title="plot of chunk unnamed-chunk-14" alt="plot of chunk unnamed-chunk-14" width="300px" style="display: block; margin: auto;" />
+</p>
 
  - Bivariate map (this is not well implemented in the moment in R), manual hacks
  required (alternatively, could predict upper/lower CI and plot CI alongside prediction)
