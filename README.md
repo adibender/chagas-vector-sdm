@@ -17,11 +17,14 @@ this code repository. However, as the full data and covariate layers could not b
 Results based on this data should not differ too much from published results.
 
 
+
 ```r
-devtools::install("mastergrids", dependencies = TRUE)
-devtools::install("tcruziutils", dependencies = TRUE)
-library(mastergrids)
-library(tcruziutils)
+# for first run install packages from this repository
+# devtools::install("mastergrids", dependencies = TRUE)
+# devtools::install("tcruziutils", dependencies = TRUE)
+# libraries
+devtools::load_all("../mastergrids")
+devtools::load_all("../tcruziutils")
 library(dplyr)
 library(purrr)
 # viz
@@ -39,6 +42,8 @@ data(wrld_simpl, package = "maptools")
 countries <- wrld_simpl %>% raster::crop(extent_tcruzi)
 # colors
 Set1   <- RColorBrewer::brewer.pal(9, "Set1")
+## set seed as generation of folds is random
+set.seed(101850)
 ```
 
 
@@ -48,10 +53,23 @@ Set1   <- RColorBrewer::brewer.pal(9, "Set1")
 - The code below downloads, imports the file and performs some preprocessing
 
 
+
 ```r
 library(httr)
 GET("https://ndownloader.figshare.com/files/10302303",
   write_disk(tf <- tempfile(fileext = ".xls")))
+```
+
+```
+## Response [https://s3-eu-west-1.amazonaws.com/pstorage-npg-968563215/10302303/SciDataData_CitationCeccarellietal.2018.xls]
+##   Date: 2020-05-10 16:54
+##   Status: 200
+##   Content-Type: binary/octet-stream
+##   Size: 5.74 MB
+## <ON DISK>  /tmp/Rtmpbi1Llj/file32cc611e8598.xls
+```
+
+```r
 df <- readxl::read_excel(tf, 1L, na = c("", " ", "NR", "NA"))
 presence_vector <- df %>%
   mutate(
@@ -77,6 +95,7 @@ presence_vector <- presence_vector %>%
 ```
 
 - imputation of the "year" variable if missing
+
 
 
 ```r
@@ -109,6 +128,7 @@ presence_vector <- presence_vector %>%
 - remove observations before 2000
 
 
+
 ```r
 presence_vector <- presence_vector %>%
   filter(start_year >= 2000)
@@ -122,6 +142,7 @@ the [Malaria Atlas Project ](https://malariaatlas.org/)
 on (imputed) year of observation
 - here, we use the `raster::getData()` function to obtain the
 environmental covariates (we use the same covariate layers for all years)
+
 
 
 
@@ -151,6 +172,7 @@ consists of the following steps:
 
 ### 1. Create presence/background dummy
 
+
 ```r
 presence_vector <- presence_vector %>%
   mutate(presence = 1L * (species == "Panstrongylus megistus"))
@@ -163,7 +185,9 @@ table(presence_vector$presence)
 ## 13412  1184
 ```
 
+
 ### 2. Split data
+
 
 ```r
 it_pv <- presence_vector %>%
@@ -176,14 +200,15 @@ train_test_df <- rsample::training(it_pv)
 
 ### 3. Create spatial folds
 
+
 ```r
 sp_tt <- as_spatial(train_test_df)
-projection(env_grids) <- projection(sp_tt)
-raster::crs(env_grids) <- raster::crs(sp_tt)
+sp_tt <- sp::spTransform(sp_tt, raster::crs(env_grids))
+countries <- sp::spTransform(countries, raster::crs(env_grids))
 sp_fold_pans_meg <- get_sp_folds(
   data        = sp_tt,
   species     = "Panstrongylus megistus",
-  mask        = env_grids,
+  mask        = countries,
   species_var = "species",
   n_blocks    = 50,# number of blocks
   k           = 5, # number of folds
@@ -192,26 +217,25 @@ sp_fold_pans_meg <- get_sp_folds(
 ```
 
 ```
-## The best folds was in iteration 77:
+## The best folds was in iteration 84:
 ##   train_0 train_1 test_0 test_1
-## 1    2537     770    792    180
-## 2    2841     782    488    168
-## 3    2463     690    866    260
-## 4    2749     794    580    156
-## 5    2726     764    603    186
+## 1    2800     795    485    144
+## 2    2574     763    711    176
+## 3    2505     706    780    233
+## 4    2555     718    730    221
+## 5    2706     774    579    165
 ```
 
+
 ```r
-# visual depiction of spatial folds + presence/background
+# graphical depiction of spatial folds + presence/background
 # within extended hull
 tmap_cv(
   sp_fold_pans_meg,
   countries = countries)
 ```
 
-<p align="center">
-<img align="center" src="figures/unnamed-chunk-9-1.png" title="plot of chunk unnamed-chunk-9" alt="plot of chunk unnamed-chunk-9" width="300px" style="display: block; margin: auto;" />
-</p>
+<img src="figure/unnamed-chunk-10-1.png" title="plot of chunk unnamed-chunk-10" alt="plot of chunk unnamed-chunk-10" width="400px" style="display: block; margin: auto;" />
 
 ### 4. Fit the model
 - In the paper we run a CV for different model specifications on folds 1 - 4
@@ -229,6 +253,7 @@ and plot the fitted model
 
 - create `formula` that specifies the linear/additive predictor using
 `make_gam_formula`
+
 
 
 ```r
@@ -251,14 +276,16 @@ mod_formula
 ##     s(bio13, by = NA) + s(bio14, by = NA) + s(bio15, by = NA) +
 ##     s(bio16, by = NA) + s(bio17, by = NA) + s(bio18, by = NA) +
 ##     s(bio19, by = NA) + s(longitude, latitude, bs = "gp")
-## <environment: 0x55d02b96f8e8>
+## <environment: 0x564cd9d23f78>
 ```
+
 
 - Fit the GAM using **`mgcv`**
 - `mgcv::bam` could be replaced by `mgcv::gam`, but has less demands w.r.t. to
 memory reqiurements and offers significant speed-up, especially with `discrete = TRUE` option ([Wood, Li, Shaddick, et al., 2017](https://doi.org/10.1080/01621459.2016.1195744))
 - set `discrete = FALSE` when calling the `predict` function to obtain smoother
 predictions
+
 
 
 ```r
@@ -273,6 +300,7 @@ mod <- mgcv::bam(
 ```
 
 ### 5. Evaluate the model
+
 
 
 ```r
@@ -294,8 +322,9 @@ MLmetrics::AUC(prediction_test, sp_fold_pans_meg$test$presence)
 ```
 
 ```
-## [1] 0.8262184
+## [1] 0.8935416
 ```
+
 
 ```r
 # evaluation w.r.t. interpolation (i.e. random hold-out data)
@@ -303,11 +332,13 @@ MLmetrics::AUC(prediction_eval_df, evaluation_df$presence)
 ```
 
 ```
-## [1] 0.95935
+## [1] 0.9632264
 ```
 
 
+
 ### 6. Refit model on all data
+
 
 ```r
 # extract data points within extended hull of Panstrongylus megistus
@@ -322,6 +353,7 @@ mod_all <- update(mod, data = as.data.frame(df_all))
 ### 7. Visualize results
 
 - Final prediction:
+
 
 
 ```r
@@ -350,12 +382,11 @@ tm_shape(raster::crop(countries, raster::extent(sp_fold_pans_meg$hull))) +
     breaks = seq(0, 1, by = .2), alpha = .8)
 ```
 
-<p align="center">
-<img src="figures/unnamed-chunk-14-1.png" title="plot of chunk unnamed-chunk-14" alt="plot of chunk unnamed-chunk-14" width="300px" style="display: block; margin: auto;" />
-</p>
+<img src="figure/unnamed-chunk-16-1.png" title="plot of chunk unnamed-chunk-16" alt="plot of chunk unnamed-chunk-16" width="400px" style="display: block; margin: auto;" />
 
  - Bivariate map (this is not well implemented in the moment in R), manual hacks
  required (alternatively, could predict upper/lower CI and plot CI alongside prediction)
+
 
 
 
@@ -369,48 +400,98 @@ bivar_map <- tm_bivariate(ndf, env_grids[[1]], sp_fold_pans_meg)
 tm_bivar_draw(bivar_map, x = .55, y = .05)
 ```
 
-<p align="center">
-<img src="figures/unnamed-chunk-15-1.png" title="plot of chunk unnamed-chunk-15" alt="plot of chunk unnamed-chunk-15" width="300px"/>
-</p>
+<img src="figure/unnamed-chunk-17-1.png" title="plot of chunk unnamed-chunk-17" alt="plot of chunk unnamed-chunk-17" width="400px" style="display: block; margin: auto;" />
 
 
 
-## References
-<a name=bib-bender_modelling_2019></a>[Bender, A, A. Python, S.
-Lindsay, et al.](#cite-bender_modelling_2019) (2019). "Modelling
-geospatial distributions of the triatomine vectors of Trypanosoma cruzi
-in Latin America". En. In: _bioRxiv_, p. 738310. DOI:
-[10.1101/738310](https://doi.org/10.1101%2F738310). URL:
-[https://www.biorxiv.org/content/10.1101/738310v1](https://www.biorxiv.org/content/10.1101/738310v1)
-(visited on Aug. 17, 2019).
+# References
+NULL
 
-<a name=bib-ceccarelli_datatri_2018></a>[Ceccarelli, S, A. Balsalobre,
-P. Medone, et al.](#cite-ceccarelli_datatri_2018) (2018). "DataTri, a
-database of American triatomine species occurrence". En. In:
-_Scientific Data_ 5, p. 180071. ISSN: 2052-4463. DOI:
-[10.1038/sdata.2018.71](https://doi.org/10.1038%2Fsdata.2018.71). URL:
-[https://www.nature.com/articles/sdata201871](https://www.nature.com/articles/sdata201871)
-(visited on Nov. 14, 2018).
 
-<a name=bib-valavi_blockcv_2018></a>[Valavi, R, J. Elith, J. J.
-Lahoz-Monfort, et al.](#cite-valavi_blockcv_2018) (2018). "blockCV: An
-r package for generating spatially or environmentally separated folds
-for k-fold cross-validation of species distribution models". In:
-_Methods in Ecology and Evolution_ 0.0. ISSN: 2041-210X. DOI:
-[10.1111/2041-210X.13107](https://doi.org/10.1111%2F2041-210X.13107).
-URL:
-[https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13107](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13107)
-(visited on Feb. 13, 2019).
+# Session Info
 
-<a name=bib-wood_gigadata_2017></a>[Wood, S. N, Z. Li, G. Shaddick, et
-al.](#cite-wood_gigadata_2017) (2017). "Generalized Additive Models for
-Gigadata: Modeling the U.K. Black Smoke Network Daily Data". In:
-_Journal of the American Statistical Association_ 112.519, pp.
-1199-1210. ISSN: 0162-1459. DOI:
-[10.1080/01621459.2016.1195744](https://doi.org/10.1080%2F01621459.2016.1195744).
-URL:
-[https://doi.org/10.1080/01621459.2016.1195744](https://doi.org/10.1080/01621459.2016.1195744)
-(visited on May. 31, 2018).
+```r
+sessionInfo()
+```
+
+```
+## R version 4.0.0 (2020-04-24)
+## Platform: x86_64-pc-linux-gnu (64-bit)
+## Running under: Ubuntu 18.04.4 LTS
+##
+## Matrix products: default
+## BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.7.1
+## LAPACK: /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.7.1
+##
+## locale:
+##  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+##  [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+##  [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8
+##  [7] LC_PAPER=en_US.UTF-8       LC_NAME=C
+##  [9] LC_ADDRESS=C               LC_TELEPHONE=C
+## [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+##
+## attached base packages:
+## [1] stats     graphics  grDevices utils     datasets  methods   base
+##
+## other attached packages:
+##  [1] sf_0.9-3          httr_1.4.1        scam_1.2-5        mgcv_1.8-31
+##  [5] nlme_3.1-147      ggplot2_3.3.0     purrr_0.3.4       dplyr_0.8.99.9002
+##  [9] tcruziutils_0.0.7 mastergrids_0.0.3 RefManageR_1.2.12 knitr_1.28
+##
+## loaded via a namespace (and not attached):
+##   [1] readxl_1.3.1          spam_2.5-1            backports_1.1.6
+##   [4] lwgeom_0.2-3          plyr_1.8.6            lazyeval_0.2.2
+##   [7] sp_1.4-1              splines_4.0.0         crosstalk_1.1.0.1
+##  [10] listenv_0.8.0         leaflet_2.0.3         gstat_2.0-5
+##  [13] usethis_1.6.1         digest_0.6.25         foreach_1.5.0
+##  [16] htmltools_0.4.0       viridis_0.5.1         fansi_0.4.1
+##  [19] magrittr_1.5          checkmate_2.0.0       memoise_1.1.0
+##  [22] MLmetrics_1.1.1       tensor_1.5            remotes_2.1.1
+##  [25] recipes_0.1.12        globals_0.12.5        gower_0.2.1
+##  [28] xts_0.12-0            rsample_0.0.6         prettyunits_1.1.1
+##  [31] colorspace_1.4-1      rgdal_1.4-8           xfun_0.13
+##  [34] leafem_0.1.1          callr_3.4.3           crayon_1.3.4
+##  [37] jsonlite_1.6.1        spatstat_1.63-3       spatstat.data_1.4-3
+##  [40] zoo_1.8-8             survival_3.1-12       iterators_1.0.12
+##  [43] glue_1.4.0            stars_0.4-1           polyclip_1.10-0
+##  [46] pals_1.6              gtable_0.3.0          ipred_0.9-9
+##  [49] pkgbuild_1.0.8        maps_3.3.0            abind_1.4-5
+##  [52] scales_1.1.0          mvtnorm_1.1-0         DBI_1.1.0
+##  [55] bibtex_0.4.2.2        Rcpp_1.0.4.6          viridisLite_0.3.0
+##  [58] progress_1.2.2        units_0.6-6           mapproj_1.2.7
+##  [61] dotCall64_1.0-0       Formula_1.2-3         intervals_0.15.2
+##  [64] stats4_4.0.0          lava_1.6.7            prodlim_2019.11.13
+##  [67] dismo_1.1-4           htmlwidgets_1.5.1     FNN_1.1.3
+##  [70] RColorBrewer_1.1-2    geosphere_1.5-10      ellipsis_0.3.0
+##  [73] farver_2.0.3          reshape_0.8.8         pkgconfig_2.0.3
+##  [76] XML_3.99-0.3          nnet_7.3-14           deldir_0.1-25
+##  [79] caret_6.0-86          tidyselect_1.0.0      rlang_0.4.6.9000
+##  [82] reshape2_1.4.4        tmaptools_3.0         cellranger_1.1.0
+##  [85] munsell_0.5.0         tools_4.0.0           xgboost_1.0.0.2
+##  [88] cli_2.0.2             generics_0.0.2        devtools_2.3.0
+##  [91] evaluate_0.14         stringr_1.4.0         goftest_1.2-2
+##  [94] ModelMetrics_1.2.2.2  processx_3.4.2        leafsync_0.1.0
+##  [97] fs_1.4.1              timereg_1.9.4         blockCV_2.1.1
+## [100] pec_2019.11.03        pbapply_1.4-2         future_1.17.0
+## [103] xml2_1.3.2            compiler_4.0.0        rstudioapi_0.11
+## [106] curl_4.3              png_0.1-7             e1071_1.7-3
+## [109] testthat_2.3.2        spatstat.utils_1.17-0 spacetime_1.2-3
+## [112] tibble_3.0.1          stringi_1.4.6         highr_0.8
+## [115] ps_1.3.3              desc_1.2.0            fields_10.3
+## [118] rgeos_0.5-3           lattice_0.20-41       Matrix_1.2-18
+## [121] classInt_0.4-3        vctrs_0.3.0           pillar_1.4.4
+## [124] lifecycle_0.2.0       furrr_0.1.0           pammtools_0.2.2
+## [127] cowplot_1.0.0         data.table_1.12.8     raster_3.1-5
+## [130] R6_2.4.1              gridExtra_2.3         KernSmooth_2.23-17
+## [133] sessioninfo_1.1.1     codetools_0.2-16      dichromat_2.0-0
+## [136] MASS_7.3-51.6         assertthat_0.2.1      pkgload_1.0.2
+## [139] rprojroot_1.3-2       withr_2.2.0           hms_0.5.3
+## [142] parallel_4.0.0        grid_4.0.0            rpart_4.1-15
+## [145] timeDate_3043.102     tidyr_1.0.3           class_7.3-17
+## [148] automap_1.0-14        tmap_3.0              pROC_1.16.2
+## [151] numDeriv_2016.8-1.1   lubridate_1.7.8       base64enc_0.1-3
+```
 
 
 
