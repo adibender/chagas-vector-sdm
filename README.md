@@ -18,9 +18,10 @@ Results based on this data should not differ too much from published results.
 
 
 ```r
-devtools::load_all("../mastergrids")
-devtools::load_all("../tcruziutils")
-# tidyverse
+devtools::install("mastergrids", dependencies = TRUE)
+devtools::install("tcruziutils", dependencies = TRUE)
+library(mastergrids)
+library(tcruziutils)
 library(dplyr)
 library(purrr)
 # viz
@@ -33,7 +34,9 @@ library(scam)
 # this is just the maximum extent of the endemic zone
 # used to crop environmental variables, etc.
 extent_tcruzi   <- tcruziutils::extent_tcruzi
-countries <- readRDS("../preprocessing/countries.Rds")
+# country polygons
+data(wrld_simpl, package = "maptools")
+countries <- wrld_simpl %>% raster::crop(extent_tcruzi)
 # colors
 Set1   <- RColorBrewer::brewer.pal(9, "Set1")
 ```
