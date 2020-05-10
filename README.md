@@ -235,7 +235,9 @@ tmap_cv(
   countries = countries)
 ```
 
+<p align="center">
 <img src="figure/unnamed-chunk-10-1.png" title="plot of chunk unnamed-chunk-10" alt="plot of chunk unnamed-chunk-10" width="400px" style="display: block; margin: auto;" />
+</p>
 
 ### 4. Fit the model
 - In the paper we run a CV for different model specifications on folds 1 - 4
