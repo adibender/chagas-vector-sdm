@@ -50,18 +50,18 @@ get_sp_folds <- function(
   if (!is.null(mask)) {
     proj <- proj4string(mask)
     extent <- extent(mask)
+    crs <- raster::crs(mask)
   } else {
     if (!is.null(rasterLayer)) {
       proj <- proj4string(rasterLayer)
       extent <- extent(rasterLayer)
     }
   }
-  proj4string(data) <- proj
   hull   <- gConvexHull(data[data$presence == 1, ])
-  proj4string(hull) <- ""
+  raster::projection(hull) <- ""
   hull <- rgeos::gBuffer(hull, width = width)
-  proj4string(hull) <- proj
   hull   <- crop(hull, extent(mask))
+  proj4string(hull) <- proj4string(mask)
   extent <- extent(hull)
   if (!is.null(rasterLayer)) {
     if (class(rasterLayer) == "SpatialGridDataFrame") {
@@ -70,7 +70,9 @@ get_sp_folds <- function(
     rasterLayer <- crop(rasterLayer, extent)
   }
   if (!is.null(mask)) {
-    mhull <- raster::intersect(hull, mask)
+
+    mhull <- rgeos::gIntersection(hull, mask)
+
   }
   area <- area(mhull, byid = FALSE) %>% sum()
   # exclude absences outside extended hull
@@ -87,7 +89,7 @@ get_sp_folds <- function(
   # approximates the length of one block based on the landmass area
   # of the spatial extent of the species and approximate number of blocks
   theRange <- sqrt(area / n_blocks)
-
+  proj4string(data) <- proj4string(mask)
   blocks <- spatialBlock(
     speciesData   = data,
     species       = "presence",
