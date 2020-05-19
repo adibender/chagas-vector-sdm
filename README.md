@@ -236,7 +236,9 @@ tmap_cv(
   countries = countries)
 ```
 
+<p align="center">
 <img src="figure/unnamed-chunk-10-1.png" title="plot of chunk unnamed-chunk-10" alt="plot of chunk unnamed-chunk-10" width="400px" style="display: block; margin: auto;" />
+</p>
 
 ### 4. Fit the model
 - In the paper we run a CV for different model specifications on folds 1 - 4
@@ -448,7 +450,9 @@ tm_shape(raster::crop(countries, raster::extent(sp_fold_pans_meg$hull))) +
     breaks = seq(0, 1, by = .2), alpha = .8)
 ```
 
+<p align="center">
 <img src="figure/unnamed-chunk-16-1.png" title="plot of chunk unnamed-chunk-16" alt="plot of chunk unnamed-chunk-16" width="400px" style="display: block; margin: auto;" />
+</p>
 
  - Bivariate map (this is not well implemented in the moment in R), manual hacks
  required (alternatively, could predict upper/lower CI and plot CI alongside prediction)
@@ -466,15 +470,51 @@ bivar_map <- tm_bivariate(ndf, env_grids[[1]], sp_fold_pans_meg)
 tm_bivar_draw(bivar_map, x = .55, y = .05)
 ```
 
+<p align="center">
 <img src="figure/unnamed-chunk-17-1.png" title="plot of chunk unnamed-chunk-17" alt="plot of chunk unnamed-chunk-17" width="400px" style="display: block; margin: auto;" />
+</p>
 
 
 
-# References
-NULL
+## References
+<a name=bib-bender_modelling_2019></a>[Bender, A, A. Python, S.
+Lindsay, et al.](#cite-bender_modelling_2019) (2019). "Modelling
+geospatial distributions of the triatomine vectors of Trypanosoma cruzi
+in Latin America". En. In: _bioRxiv_, p. 738310. DOI:
+[10.1101/738310](https://doi.org/10.1101%2F738310). URL:
+[https://www.biorxiv.org/content/10.1101/738310v1](https://www.biorxiv.org/content/10.1101/738310v1)
+(visited on Aug. 17, 2019).
+
+<a name=bib-ceccarelli_datatri_2018></a>[Ceccarelli, S, A. Balsalobre,
+P. Medone, et al.](#cite-ceccarelli_datatri_2018) (2018). "DataTri, a
+database of American triatomine species occurrence". En. In:
+_Scientific Data_ 5, p. 180071. ISSN: 2052-4463. DOI:
+[10.1038/sdata.2018.71](https://doi.org/10.1038%2Fsdata.2018.71). URL:
+[https://www.nature.com/articles/sdata201871](https://www.nature.com/articles/sdata201871)
+(visited on Nov. 14, 2018).
+
+<a name=bib-valavi_blockcv_2018></a>[Valavi, R, J. Elith, J. J.
+Lahoz-Monfort, et al.](#cite-valavi_blockcv_2018) (2018). "blockCV: An
+r package for generating spatially or environmentally separated folds
+for k-fold cross-validation of species distribution models". In:
+_Methods in Ecology and Evolution_ 0.0. ISSN: 2041-210X. DOI:
+[10.1111/2041-210X.13107](https://doi.org/10.1111%2F2041-210X.13107).
+URL:
+[https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13107](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13107)
+(visited on Feb. 13, 2019).
+
+<a name=bib-wood_gigadata_2017></a>[Wood, S. N, Z. Li, G. Shaddick, et
+al.](#cite-wood_gigadata_2017) (2017). "Generalized Additive Models for
+Gigadata: Modeling the U.K. Black Smoke Network Daily Data". In:
+_Journal of the American Statistical Association_ 112.519, pp.
+1199-1210. ISSN: 0162-1459. DOI:
+[10.1080/01621459.2016.1195744](https://doi.org/10.1080%2F01621459.2016.1195744).
+URL:
+[https://doi.org/10.1080/01621459.2016.1195744](https://doi.org/10.1080/01621459.2016.1195744)
+(visited on May. 31, 2018).
 
 
-# Session Info
+## Session Info
 
 ```r
 sessionInfo()
