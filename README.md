@@ -1,21 +1,18 @@
 # Species distribution models of chagas vectors
 
-This folder contains code used to fit species ditribution models for chagas vectors.
+This folder contains code used to fit species ditribution models for chagas vectors as described here: https://www.biorxiv.org/content/10.1101/738310v1.
+Note that the Article is in Revision at PLOS NTD and was updated since.
 
-**Disclaimer**: The analysis is not reproducible as it relies on
-a specific location of covariate layers and some confidential data that
-could not be made public. Therefore, we provide here code that demonstrates the
-workflow and uses freely available data only. Note: the folder structure is
-described further below after the exemplary analysis.
+**Disclaimer**: Since our workflow relies on some data (particularly the satellite data) that require users to sign up to a series of separate open access licences with various organisations, we created a demo (within the README of the repository) that can be run directly (the code calls some functions that download presence data as well as environmental covariates). This demo illustrates the workflow for one species. Further, all code used for analyses in the manuscript is also available in the repository and described in the README.
+
 
 If anything is unclear or not working, please don't hesitate to open up an issue.
 
 
 # Examplary analysis
 This section illustrates the workflow presented in [Bender, Python, Lindsay, et al. (2019)](https://www.biorxiv.org/content/10.1101/738310v1). Note that full details are given in the manuscript and
-this code repository. However, as the full data and covariate layers could not be shared, this demo provides a reproducible example with freely available data.
-Results based on this data should not differ too much from published results.
-
+this code repository (see also description of the Folder structure below the
+demo analysis).
 
 
 ```r
@@ -23,8 +20,8 @@ Results based on this data should not differ too much from published results.
 # devtools::install("mastergrids", dependencies = TRUE)
 # devtools::install("tcruziutils", dependencies = TRUE)
 # libraries
-devtools::load_all("../mastergrids")
-devtools::load_all("../tcruziutils")
+devtools::load_all("mastergrids")
+devtools::load_all("tcruziutils")
 library(dplyr)
 library(purrr)
 # viz
@@ -93,6 +90,9 @@ presence_vector <- presence_vector %>%
   rename_all(~tolower(sub(" ", "_", .))) %>%
   select(-reference)
 ```
+
+
+
 
 - imputation of the "year" variable if missing
 
@@ -166,7 +166,8 @@ consists of the following steps:
 3. The spatial blocks/spatial CV is set up using function
 `get_sp_folds` which is a wrapper around the package [**`blockCV`**](https://github.com/rvalavi/blockCV) ([Valavi, Elith, Lahoz-Monfort, et al., 2018](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13107))
 
-4. Fit the model on "training data" (spatial folds 1-4). Here, for illustration, there is no model selection of different models/settings
+4. Fit the model on "training data" (spatial folds 1-4). Here, for conciseness
+we perform a very narrow model comparison of only two competing models.
 
 5. Asses the models performance on data not used during model selection/fit
 
@@ -203,8 +204,7 @@ train_test_df <- rsample::training(it_pv)
 
 ```r
 sp_tt <- as_spatial(train_test_df)
-sp_tt <- sp::spTransform(sp_tt, raster::crs(env_grids))
-countries <- sp::spTransform(countries, raster::crs(env_grids))
+raster::crs(countries) <- raster::crs(sp_tt)
 sp_fold_pans_meg <- get_sp_folds(
   data        = sp_tt,
   species     = "Panstrongylus megistus",
@@ -227,6 +227,7 @@ sp_fold_pans_meg <- get_sp_folds(
 ```
 
 
+
 ```r
 # graphical depiction of spatial folds + presence/background
 # within extended hull
@@ -235,9 +236,7 @@ tmap_cv(
   countries = countries)
 ```
 
-<p align="center">
 <img src="figure/unnamed-chunk-10-1.png" title="plot of chunk unnamed-chunk-10" alt="plot of chunk unnamed-chunk-10" width="400px" style="display: block; margin: auto;" />
-</p>
 
 ### 4. Fit the model
 - In the paper we run a CV for different model specifications on folds 1 - 4
@@ -248,8 +247,8 @@ reported in the table)
 - this model was also used for evaluation on the random hold-out data (`evaluation_df`) above
 - After evaluation the final model was obtained by refitting this model on all
 available data (folds 1 -5 and random evaluation data)
-- Here we just run one model on folds 1-4, evaluate on fold 5 and hold-out data
-and plot the fitted model
+- Here we only compare two different models (one with smooth covariate effects,
+one with linear effects) to keep code and runtime short.
 
 #### Fit the GAM
 
@@ -261,6 +260,7 @@ and plot the fitted model
 ```r
 # create formula
 # make_gam_formula: only vars with unique(var) > 20 used
+# formula with smooth effects
 mod_formula <-
   make_gam_formula(
     as.data.frame(sp_fold_pans_meg$train),
@@ -278,7 +278,24 @@ mod_formula
 ##     s(bio13, by = NA) + s(bio14, by = NA) + s(bio15, by = NA) +
 ##     s(bio16, by = NA) + s(bio17, by = NA) + s(bio18, by = NA) +
 ##     s(bio19, by = NA) + s(longitude, latitude, bs = "gp")
-## <environment: 0x564cd9d23f78>
+## <environment: 0x55fed13bab20>
+```
+
+```r
+# formula with linear effects
+mod_formula2 <-
+  make_gam_formula(
+    as.data.frame(sp_fold_pans_meg$train),
+    candidates=names(env_grids),
+    type = "linear")
+mod_formula2
+```
+
+```
+## presence ~ bio1 + bio2 + bio3 + bio4 + bio5 + bio6 + bio7 + bio8 +
+##     bio9 + bio10 + bio11 + bio12 + bio13 + bio14 + bio15 + bio16 +
+##     bio17 + bio18 + bio19
+## <environment: 0x55fecbf27f60>
 ```
 
 
@@ -291,7 +308,54 @@ predictions
 
 
 ```r
-# see mgcv::bam for references
+# see ?mgcv::bam for references
+folds <- 1:4
+train <- as.data.frame(sp_fold_pans_meg$train)
+##  create 4 models (each without one of the folds)
+# smooth effects
+models_smooth <- purrr::map(folds,
+  ~ mgcv::bam(mod_formula, as.data.frame(train[train$fold != .x, ]),
+      family = "binomial", method = "fREML", discrete = TRUE, gamma = 2L))
+# linear effects
+models_linear <- purrr::map(folds,
+  ~ mgcv::bam(mod_formula2, as.data.frame(train[train$fold != .x, ]),
+      family = "binomial", method = "fREML", gamma = 2L))
+# auc for each model
+auc_smooth <- map_dbl(
+  folds,
+  ~{
+    predicted <- predict(models_smooth[[.x]], train[train$fold == .x, ], discrete = FALSE)
+    observed <- train[train$fold == .x, "presence"]
+    MLmetrics::AUC(predicted, observed)
+  })
+# AUC linear models
+auc_linear <- map_dbl(
+  folds,
+  ~{
+    predicted <- predict(models_linear[[.x]], train[train$fold == .x, ], discrete = FALSE)
+    observed <- train[train$fold == .x, "presence"]
+    MLmetrics::AUC(predicted, observed)
+  })
+# comparison
+mean(auc_smooth)
+```
+
+```
+## [1] 0.8603036
+```
+
+```r
+mean(auc_linear)
+```
+
+```
+## [1] 0.8401573
+```
+
+```r
+# in this case we would select the model with smooth effects of covariates
+
+## Refit model for evaluation
 mod <- mgcv::bam(
   formula  = mod_formula,
   data     = as.data.frame(sp_fold_pans_meg$train),
@@ -384,9 +448,7 @@ tm_shape(raster::crop(countries, raster::extent(sp_fold_pans_meg$hull))) +
     breaks = seq(0, 1, by = .2), alpha = .8)
 ```
 
-<p align="center">
 <img src="figure/unnamed-chunk-16-1.png" title="plot of chunk unnamed-chunk-16" alt="plot of chunk unnamed-chunk-16" width="400px" style="display: block; margin: auto;" />
-</p>
 
  - Bivariate map (this is not well implemented in the moment in R), manual hacks
  required (alternatively, could predict upper/lower CI and plot CI alongside prediction)
@@ -404,51 +466,15 @@ bivar_map <- tm_bivariate(ndf, env_grids[[1]], sp_fold_pans_meg)
 tm_bivar_draw(bivar_map, x = .55, y = .05)
 ```
 
-<p align="center">
 <img src="figure/unnamed-chunk-17-1.png" title="plot of chunk unnamed-chunk-17" alt="plot of chunk unnamed-chunk-17" width="400px" style="display: block; margin: auto;" />
-</p>
 
 
 
-## References
-<a name=bib-bender_modelling_2019></a>[Bender, A, A. Python, S.
-Lindsay, et al.](#cite-bender_modelling_2019) (2019). "Modelling
-geospatial distributions of the triatomine vectors of Trypanosoma cruzi
-in Latin America". En. In: _bioRxiv_, p. 738310. DOI:
-[10.1101/738310](https://doi.org/10.1101%2F738310). URL:
-[https://www.biorxiv.org/content/10.1101/738310v1](https://www.biorxiv.org/content/10.1101/738310v1)
-(visited on Aug. 17, 2019).
-
-<a name=bib-ceccarelli_datatri_2018></a>[Ceccarelli, S, A. Balsalobre,
-P. Medone, et al.](#cite-ceccarelli_datatri_2018) (2018). "DataTri, a
-database of American triatomine species occurrence". En. In:
-_Scientific Data_ 5, p. 180071. ISSN: 2052-4463. DOI:
-[10.1038/sdata.2018.71](https://doi.org/10.1038%2Fsdata.2018.71). URL:
-[https://www.nature.com/articles/sdata201871](https://www.nature.com/articles/sdata201871)
-(visited on Nov. 14, 2018).
-
-<a name=bib-valavi_blockcv_2018></a>[Valavi, R, J. Elith, J. J.
-Lahoz-Monfort, et al.](#cite-valavi_blockcv_2018) (2018). "blockCV: An
-r package for generating spatially or environmentally separated folds
-for k-fold cross-validation of species distribution models". In:
-_Methods in Ecology and Evolution_ 0.0. ISSN: 2041-210X. DOI:
-[10.1111/2041-210X.13107](https://doi.org/10.1111%2F2041-210X.13107).
-URL:
-[https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13107](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13107)
-(visited on Feb. 13, 2019).
-
-<a name=bib-wood_gigadata_2017></a>[Wood, S. N, Z. Li, G. Shaddick, et
-al.](#cite-wood_gigadata_2017) (2017). "Generalized Additive Models for
-Gigadata: Modeling the U.K. Black Smoke Network Daily Data". In:
-_Journal of the American Statistical Association_ 112.519, pp.
-1199-1210. ISSN: 0162-1459. DOI:
-[10.1080/01621459.2016.1195744](https://doi.org/10.1080%2F01621459.2016.1195744).
-URL:
-[https://doi.org/10.1080/01621459.2016.1195744](https://doi.org/10.1080/01621459.2016.1195744)
-(visited on May. 31, 2018).
+# References
+NULL
 
 
-## Session Info
+# Session Info
 
 ```r
 sessionInfo()
@@ -533,6 +559,70 @@ sessionInfo()
 ## [151] numDeriv_2016.8-1.1   lubridate_1.7.8       base64enc_0.1-3
 ```
 
+
+
+# Folder structure
+Overview of project files and folders:
+
+- Preliminary notes:
+    + The initial steps of this project requiere access to the **`mastergrids`** folder at Maleria Atlas Project and will thus not be fully reproducible
+
+- **`mastergrids`**:
+An **`R`** package that facilitates the import of environmental
+raster data from the **`mastergrids`** folder at BDI MAP and some
+utility functions to transform rasters to data frames and vice versa
+(the data import won't work outside of the BDI/without connection to mastergrids). Also contains two functions `grid_to_df` and `df_to_grid` which
+convert RasterLayer/RasterBrick object to a data frame and vice versa.
+
+- **`tcruziutils`**: An **`R`** package that facilitates all steps of the
+analysis. Most functions are specific to this project and should not be used
+for general purpose projects. It can be loaded at the beginning of the script
+using `devtools::load_all("<path to project>/tcruziutils")` or installed via
+`devtools::install("<path to project>/tcruziutils")` and then loaded as usual
+with `library(tcruziutils)`
+
+- **`infection data`** (not included):
+Contains data on infection prevalence and presence in vectors and humans
+    + **`External vector database`**: Additional data set (compiled by another
+    research group that contains *presence only* data on different
+    vector species)
+
+- **`endemic zone`** (not included):
+Contains a shape-file that defines the endemic zone of the
+disease ("mask"). Can be used to crop environmental grid data and other spatial
+objects. The spatial extent defined by this mask is stored in the
+**`tcruziutils`** package as `raster::extent` and `sp::bbox` objects for
+convenience (see `tcruziutils::extent_tcruzi` and `tcruziutils::bbox_tcruzi`).
+
+- **`polygon boundaries`** (not included):
+Shapefiles containing polygon boundaries on administrative district levels 1 and 2. Used to extract location/area and polygon information based on the GAUL code. Cropped according to endemic zone and stored as `shp_admin_1.Rds` and `shp_admin_2.Rds` in the **`preprocessing`** folder
+
+- **`preprocessing`**:
+This folder contains the main pre-processing scripts and stores the pre-processed data sets that will be used for modeling
+
+    + `import.R`: Initial data import of the presence/prevalence. For
+    observations recorded on a polygon level, also adds the centroid
+    and area information of the respective polygon to the data (see function
+    `add_spat_dat` in **`tcruziutils`** package)
+
+    + `prep-for-modeling.Rmd`: Builds on the `import.R` script and pre-processes the initially imported data for modeling purposes. This includes:
+      - application of inclusion/exclusion criteria
+      - imputation of (some) missing data
+      - addition of covariate layers to the observed presence/absence data
+      (based on coordinates; see `raster::extract` and
+      `tcruziutils::add_grid_data`)
+      - Splits the data set in *train*/*test* data (and possibly *evaluation*
+      data). Additionally creates block-wise cross-validation scheme,
+      stored as `fold` variable in the original data.
+      - also produces some additional visualizations (stored in
+      `tcruzi/figures` as `pdf` and `png`)
+
+
+- **`modeling`**:
+
+     - **`vector_occurrence-sdm`**:
+     Folder containing Species Distribution Models (SDM) based on presense only data:
+     - See README therein
 
 
 # Folder structure
